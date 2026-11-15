@@ -50,7 +50,7 @@ footer{font-size:12.5px;color:var(--muted)}
 <div class="wrap">
   <header>
     <h1>E. vermicularis өндөг тоолуур</h1>
-    <p class="sub">YOLO26s + SAHI илрүүлэлт · AKAZE/RANSAC бүртгэл + Global Tracking · Бүх тооцоолол таны хөтөч дотор явагдана, зураг серверт илгээгдэхгүй.</p>
+    <p class="sub hidden">YOLO26s + SAHI илрүүлэлт · AKAZE/RANSAC бүртгэл + Global Tracking · Бүх тооцоолол таны хөтөч дотор явагдана, зураг серверт илгээгдэхгүй.</p>
     <div class="row" style="margin-top:10px"><span class="chip"><span class="dot" id="mdot"></span><span id="mstat">Загвар ачаалж байна…</span></span><span class="chip" id="epchip">—</span></div>
   </header>
 
@@ -69,7 +69,7 @@ footer{font-size:12.5px;color:var(--muted)}
       <div class="card">
         <label>Итгэлийн босго <b id="iconfv">0.60</b><input type="range" id="iconf" min="0.25" max="0.95" step="0.01" value="0.60"></label>
         <div class="row"><button class="btn" id="ipng" disabled>PNG татах</button><button class="btn" id="icsv" disabled>CSV татах</button></div>
-        <p class="note">Зургийг 640×640 хэсгүүдэд (давхцал 20%) хувааж илрүүлээд, давхардсан хайрцгийг NMS-ээр нэгтгэнэ.</p>
+        <p class="note hidden">Зургийг 640×640 хэсгүүдэд (давхцал 20%) хувааж илрүүлээд, давхардсан хайрцгийг NMS-ээр нэгтгэнэ.</p>
       </div>
     </div>
   </section>
@@ -78,7 +78,7 @@ footer{font-size:12.5px;color:var(--muted)}
   <section id="tab-vid" class="grid hidden">
     <div class="card">
       <div class="drop" id="vdrop"><span id="vlabel">Микроскопын видеогоо энд чирж оруулах эсвэл <u>сонгох</u></span><input type="file" id="vfile" accept="video/*" hidden></div>
-      <div class="row" style="align-items:center"><button class="btn" id="vcamBtn">📷 Камераас шууд тоолох</button><select id="vcamSel" class="hidden" style="font:inherit;padding:7px;border:1px solid var(--line);border-radius:8px;max-width:260px"></select><span id="vmode" style="color:var(--muted);font-size:13px"></span></div>
+      <div class="row hidden" style="align-items:center"><button class="btn" id="vcamBtn">📷 Камераас шууд тоолох</button><select id="vcamSel" class="hidden" style="font:inherit;padding:7px;border:1px solid var(--line);border-radius:8px;max-width:260px"></select><span id="vmode" style="color:var(--muted);font-size:13px"></span></div>
       <video id="video" muted playsinline class="hidden"></video>
       <canvas class="view hidden" id="vcanvas"></canvas>
       <div class="bar" id="vbarWrap"><i id="vbar"></i></div>
@@ -87,21 +87,21 @@ footer{font-size:12.5px;color:var(--muted)}
     </div>
     <div class="side">
       <div class="card"><div class="big" id="vcount">—</div><div style="color:var(--muted)">давхардалгүй өндөг (баталгаажсан ID)</div>
-        <div class="kv"><span>Хугацаа</span><span id="vt">—</span><span>Тухайн фрейм</span><span id="vvis">—</span><span>Бүх ID</span><span id="vall">—</span><span>Бүртгэл алдаа</span><span id="vfail">—</span><span>Харьцуулалт</span><span id="vref">—</span></div></div>
+        <div class="kv"><span>Хугацаа</span><span id="vt">—</span><span>Тухайн фрейм</span><span id="vvis">—</span><span>Бүх ID</span><span id="vall">—</span><span>Бүртгэл алдаа</span><span id="vfail">—</span><span class="hidden">Харьцуулалт</span><span class="hidden" id="vref">—</span></div></div>
       <div class="card">
         <label>Итгэлийн босго <b id="vconfv">0.60</b><input type="range" id="vconf" min="0.25" max="0.95" step="0.01" value="0.60"></label>
         <label>Томруулалт (харах талбай) <b id="vupv">2.0×</b><input type="range" id="vup" min="1" max="3" step="0.5" value="2"></label>
-        <label>Түүвэрлэх алхам, секунд<input type="number" id="vint" min="0.04" max="1" step="0.02" value="0.1"></label>
-        <label>Баталгаажих хамгийн бага ажиглалт<input type="number" id="vhits" min="1" max="10" step="1" value="3"></label>
-        <label>Гараар тоолсон тоо (заавал биш)<input type="number" id="vmanual" min="0" step="1" placeholder="жишээ нь 17"></label>
-        <label class="check"><input type="checkbox" id="vfast"> Хурдан горим (бүртгэлийг хагас нягтралаар)</label>
+        <label class="hidden">Түүвэрлэх алхам, секунд<input type="number" id="vint" min="0.04" max="1" step="0.02" value="0.1"></label>
+        <label class="hidden">Баталгаажих хамгийн бага ажиглалт<input type="number" id="vhits" min="1" max="10" step="1" value="3"></label>
+        <label class="hidden">Гараар тоолсон тоо (заавал биш)<input type="number" id="vmanual" min="0" step="1" placeholder="жишээ нь 17"></label>
+        <label class="check hidden"><input type="checkbox" id="vfast"> Хурдан горим (бүртгэлийг хагас нягтралаар)</label>
         <div class="row"><button class="btn primary" id="vstart" disabled>Эхлүүлэх</button><button class="btn" id="vstop" disabled>Зогсоох</button><button class="btn" id="vcsv" disabled>CSV татах</button></div>
-        <p class="note">Видео файл сонгомогц тоолол автоматаар эхэлнэ. Камерын горимд «Зогсоох» дартал бодит хугацаанд тоолно. Фрейм бүрийг AKAZE онцлог цэг + RANSAC-аар нэг глобал координатад бүртгэж, нэг өндгийг дахин тоолохгүй. Бүртгэл амжилтгүй фреймийн илрүүлэлтийг тоололд оруулахгүй.</p>
+        <p class="note hidden">Видео файл сонгомогц тоолол автоматаар эхэлнэ. Камерын горимд «Зогсоох» дартал бодит хугацаанд тоолно. Фрейм бүрийг AKAZE онцлог цэг + RANSAC-аар нэг глобал координатад бүртгэж, нэг өндгийг дахин тоолохгүй. Бүртгэл амжилтгүй фреймийн илрүүлэлтийг тоололд оруулахгүй.</p>
       </div>
     </div>
   </section>
 
-  <footer>Судалгааны туршилтын хэрэгсэл. Үр дүн нь лабораторийн мэргэжилтний дүгнэлтийг орлохгүй. Загвар: YOLO26s, 35 зураг / 1334 өндгөөр сургасан (5-fold CV: F1 ≈ 0.81–0.84).</footer>
+  <footer class="hidden">Судалгааны туршилтын хэрэгсэл. Үр дүн нь лабораторийн мэргэжилтний дүгнэлтийг орлохгүй. Загвар: YOLO26s, 35 зураг / 1334 өндгөөр сургасан (5-fold CV: F1 ≈ 0.81–0.84).</footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.js"></script>
