@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E. vermicularis өндөг тоолуур</title>
+<meta name="description" content="YOLO26s + SAHI + AKAZE/RANSAC + Global Tracking — хөтөч дотор ажилладаг хялгасан хорхойн өндөг илрүүлэгч">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--ink:#14202e;--muted:#5d6b7e;--line:#dbe2ec;--teal:#0f8a7e;--teal-soft:#e3f4f1;--egg:#1f9d63;--warn:#d9822b;--bad:#cf3f35;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans)}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 18px 60px;display:flex;flex-direction:column;gap:20px}
+h1{margin:0;font-size:clamp(22px,3vw,30px);line-height:1.2}
+.sub{color:var(--muted);margin:6px 0 0}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--warn)} .dot.ok{background:var(--egg)} .dot.err{background:var(--bad)}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:10px 16px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent}
+.tab.on{color:var(--teal);border-color:var(--teal)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;background:#fafcfd}
+.drop.hover{border-color:var(--teal);background:var(--teal-soft)}
+canvas.view{width:100%;height:auto;border-radius:8px;background:#eef1f5;display:block}
+.side{display:flex;flex-direction:column;gap:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+label b{color:var(--ink);font-family:var(--mono);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--teal)}
+input[type=number]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%}
+.check{flex-direction:row;align-items:center;gap:8px;color:var(--ink)}
+button.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:9px 14px;cursor:pointer}
+button.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+button.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.big{font-size:44px;font-weight:600;line-height:1;color:var(--teal);font-variant-numeric:tabular-nums}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px}
+.kv span:nth-child(odd){color:var(--muted)} .kv span:nth-child(even){font-family:var(--mono);text-align:right}
+.bar{height:8px;background:#e7ecf2;border-radius:4px;overflow:hidden} .bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .2s}
+.note{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.hidden{display:none!important}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)} .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+footer{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>E. vermicularis өндөг тоолуур</h1>
+    <p class="sub">YOLO26s + SAHI илрүүлэлт · AKAZE/RANSAC бүртгэл + Global Tracking · Бүх тооцоолол таны хөтөч дотор явагдана, зураг серверт илгээгдэхгүй.</p>
+    <div class="row" style="margin-top:10px"><span class="chip"><span class="dot" id="mdot"></span><span id="mstat">Загвар ачаалж байна…</span></span><span class="chip" id="epchip">—</span></div>
+  </header>
+
+  <nav class="tabs"><button class="tab on" data-tab="img">Зураг</button><button class="tab" data-tab="vid">Видео</button></nav>
+
+  <!-- ЗУРАГ -->
+  <section id="tab-img" class="grid">
+    <div class="card">
+      <div class="drop" id="idrop">Микроскопын зургаа энд чирж оруулах эсвэл <u>сонгох</u><input type="file" id="ifile" accept="image/*" hidden></div>
+      <canvas class="view hidden" id="icanvas"></canvas>
+      <div class="legend"><span><i style="background:#1f9d63"></i>илэрсэн өндөг</span></div>
+    </div>
+    <div class="side">
+      <div class="card"><div class="big" id="icount">—</div><div style="color:var(--muted)">илэрсэн өндөг</div>
+        <div class="kv"><span>Зургийн хэмжээ</span><span id="isize">—</span><span>SAHI хэсэг</span><span id="itiles">—</span><span>Хугацаа</span><span id="itime">—</span></div></div>
+      <div class="card">
+        <label>Итгэлийн босго <b id="iconfv">0.60</b><input type="range" id="iconf" min="0.25" max="0.95" step="0.01" value="0.60"></label>
+        <div class="row"><button class="btn" id="ipng" disabled>PNG татах</button><button class="btn" id="icsv" disabled>CSV татах</button></div>
+        <p class="note">Зургийг 640×640 хэсгүүдэд (давхцал 20%) хувааж илрүүлээд, давхардсан хайрцгийг NMS-ээр нэгтгэнэ.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ВИДЕО -->
+  <section id="tab-vid" class="grid hidden">
+    <div class="card">
+      <div class="drop" id="vdrop"><span id="vlabel">Микроскопын видеогоо энд чирж оруулах эсвэл <u>сонгох</u></span><input type="file" id="vfile" accept="video/*" hidden></div>
+      <div class="row" style="align-items:center"><button class="btn" id="vcamBtn">📷 Камераас шууд тоолох</button><select id="vcamSel" class="hidden" style="font:inherit;padding:7px;border:1px solid var(--line);border-radius:8px;max-width:260px"></select><span id="vmode" style="color:var(--muted);font-size:13px"></span></div>
+      <video id="video" muted playsinline class="hidden"></video>
+      <canvas class="view hidden" id="vcanvas"></canvas>
+      <div class="bar" id="vbarWrap"><i id="vbar"></i></div>
+      <div class="legend"><span><i style="background:#1f9d63"></i>баталгаажсан ID</span><span><i style="background:#e8961f"></i>шинэ ID (ажиглалт цөөн)</span><span><i style="background:#cf3f35"></i>бүртгэл амжилтгүй — тоолохгүй</span></div>
+      <canvas class="view hidden" id="vchart" width="900" height="260"></canvas>
+    </div>
+    <div class="side">
+      <div class="card"><div class="big" id="vcount">—</div><div style="color:var(--muted)">давхардалгүй өндөг (баталгаажсан ID)</div>
+        <div class="kv"><span>Хугацаа</span><span id="vt">—</span><span>Тухайн фрейм</span><span id="vvis">—</span><span>Бүх ID</span><span id="vall">—</span><span>Бүртгэл алдаа</span><span id="vfail">—</span><span>Харьцуулалт</span><span id="vref">—</span></div></div>
+      <div class="card">
+        <label>Итгэлийн босго <b id="vconfv">0.60</b><input type="range" id="vconf" min="0.25" max="0.95" step="0.01" value="0.60"></label>
+        <label>Томруулалт (харах талбай) <b id="vupv">2.0×</b><input type="range" id="vup" min="1" max="3" step="0.5" value="2"></label>
+        <label>Түүвэрлэх алхам, секунд<input type="number" id="vint" min="0.04" max="1" step="0.02" value="0.1"></label>
+        <label>Баталгаажих хамгийн бага ажиглалт<input type="number" id="vhits" min="1" max="10" step="1" value="3"></label>
+        <label>Гараар тоолсон тоо (заавал биш)<input type="number" id="vmanual" min="0" step="1" placeholder="жишээ нь 17"></label>
+        <label class="check"><input type="checkbox" id="vfast"> Хурдан горим (бүртгэлийг хагас нягтралаар)</label>
+        <div class="row"><button class="btn primary" id="vstart" disabled>Эхлүүлэх</button><button class="btn" id="vstop" disabled>Зогсоох</button><button class="btn" id="vcsv" disabled>CSV татах</button></div>
+        <p class="note">Видео файл сонгомогц тоолол автоматаар эхэлнэ. Камерын горимд «Зогсоох» дартал бодит хугацаанд тоолно. Фрейм бүрийг AKAZE онцлог цэг + RANSAC-аар нэг глобал координатад бүртгэж, нэг өндгийг дахин тоолохгүй. Бүртгэл амжилтгүй фреймийн илрүүлэлтийг тоололд оруулахгүй.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>Судалгааны туршилтын хэрэгсэл. Үр дүн нь лабораторийн мэргэжилтний дүгнэлтийг орлохгүй. Загвар: YOLO26s, 35 зураг / 1334 өндгөөр сургасан (5-fold CV: F1 ≈ 0.81–0.84).</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.js"></script>
+<script>
+/* ===================== ТОХИРГОО ===================== */
+const CFG = {
+  MODEL_URL: 'model/ev_yolo26s_640_nms_fp16.onnx',   // fp32 ашиглах бол: 'model/ev_yolo26s_640_nms.onnx'
+  ORT_WASM: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/',
+  OPENCV_URL: 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js',
+  TILE: 640, OVERLAP: 0.2, MIN_SCORE: 0.25, IOU: 0.5,
+};
+const $ = id => document.getElementById(id);
+
+/* ===================== ЗАГВАР ===================== */
+let session = null, inName = 'images', outName = 'output0';
+async function loadModel() {
+  ort.env.wasm.wasmPaths = CFG.ORT_WASM;
+  const eps = [];
+  if (navigator.gpu) eps.push('webgpu');
+  eps.push('wasm');
+  for (const ep of eps) {
+    try {
+      session = await ort.InferenceSession.create(CFG.MODEL_URL, { executionProviders: [ep], graphOptimizationLevel: 'all' });
+      inName = session.inputNames[0]; outName = session.outputNames[0];
+      $('epchip').textContent = ep === 'webgpu' ? 'WebGPU' : 'WASM (CPU)';
+      $('mdot').className = 'dot ok'; $('mstat').textContent = 'Загвар бэлэн'; $('vstart').disabled = !vFileReady; if (pendingAuto) { pendingAuto = false; startFile(); }
+      return;
+    } catch (e) { console.warn('EP failed', ep, e); }
+  }
+  $('mdot').className = 'dot err'; $('mstat').textContent = 'Загвар ачаалж чадсангүй: ' + CFG.MODEL_URL + ' байгаа эсэхийг шалгана уу';
+}
+
+/* ===================== ИЛРҮҮЛЭЛТ (SAHI) ===================== */
+const lb = document.createElement('canvas'); lb.width = lb.height = CFG.TILE;
+const lbx = lb.getContext('2d', { willReadFrequently: true });
+const inputBuf = new Float32Array(3 * CFG.TILE * CFG.TILE);
+const IS_FP16 = /fp16/i.test(CFG.MODEL_URL);
+const f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
+function toHalf(v) { f32[0] = v; const x = u32[0], s = (x >>> 16) & 0x8000; let e = ((x >>> 23) & 0xff) - 112, m = x & 0x7fffff;
+  if (e <= 0) { if (e < -10) return s; m = (m | 0x800000) >> (1 - e); return s | ((m + 0x1000) >> 13); } if (e >= 31) return s | 0x7c00; return s | (e << 10) | ((m + 0x1000) >> 13); }
+function fromHalf(h) { const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 0x1f, f = h & 0x3ff; if (e === 0) return s * Math.pow(2, -14) * (f / 1024); if (e === 31) return f ? NaN : s * Infinity; return s * Math.pow(2, e - 15) * (1 + f / 1024); }
+const halfBuf = new Uint16Array(3 * CFG.TILE * CFG.TILE);
+function starts(L) { const T = CFG.TILE; if (L <= T) return [0]; const step = Math.floor(T * (1 - CFG.OVERLAP)); const s = []; for (let v = 0; v < L - T; v += step) s.push(v); s.push(L - T); return [...new Set(s)].sort((a, b) => a - b); }
+function slices(w, h) { const out = []; for (const y of starts(h)) for (const x of starts(w)) out.push([x, y, Math.min(CFG.TILE, w - x), Math.min(CFG.TILE, h - y)]); return out; }
+async function runRegion(src, sx, sy, sw, sh) {
+  const T = CFG.TILE, r = Math.min(T / sw, T / sh), nw = Math.round(sw * r), nh = Math.round(sh * r), left = Math.floor((T - nw) / 2), top = Math.floor((T - nh) / 2);
+  lbx.fillStyle = 'rgb(114,114,114)'; lbx.fillRect(0, 0, T, T); lbx.drawImage(src, sx, sy, sw, sh, left, top, nw, nh);
+  const d = lbx.getImageData(0, 0, T, T).data, A = T * T;
+  for (let i = 0; i < A; i++) { inputBuf[i] = d[4 * i] / 255; inputBuf[A + i] = d[4 * i + 1] / 255; inputBuf[2 * A + i] = d[4 * i + 2] / 255; }
+  let feed;
+  if (IS_FP16) { for (let i = 0; i < inputBuf.length; i++) halfBuf[i] = toHalf(inputBuf[i]); feed = new ort.Tensor('float16', halfBuf, [1, 3, T, T]); }
+  else feed = new ort.Tensor('float32', inputBuf, [1, 3, T, T]);
+  const res = await session.run({ [inName]: feed });
+  let o = res[outName].data; if (o instanceof Uint16Array) o = Float32Array.from(o, fromHalf); const out = [];
+  for (let i = 0; i < o.length / 6; i++) { const s = o[i * 6 + 4]; if (s < CFG.MIN_SCORE) continue;
+    out.push([(o[i * 6] - left) / r + sx, (o[i * 6 + 1] - top) / r + sy, (o[i * 6 + 2] - left) / r + sx, (o[i * 6 + 3] - top) / r + sy, s]); }
+  return out;
+}
+const area = b => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+const inter = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+function merge(boxes) { // NMS (IoU) + IOS dedup
+  const keep = []; for (const b of boxes.sort((a, c) => c[4] - a[4])) {
+    if (keep.every(k => { const i = inter(b, k); return i / (area(b) + area(k) - i + 1e-9) <= CFG.IOU && i / Math.max(1, Math.min(area(b), area(k))) <= 0.5; })) keep.push(b);
+  } return keep;
+}
+async function detect(src, w, h, standard = false) {
+  let all = []; const sl = slices(w, h);
+  for (const [x, y, sw, sh] of sl) all = all.concat(await runRegion(src, x, y, sw, sh));
+  if (standard && sl.length > 1) all = all.concat(await runRegion(src, 0, 0, w, h));
+  return { boxes: merge(all), tiles: sl.length + (standard && sl.length > 1 ? 1 : 0) };
+}
+
+/* ===================== ЗУРАГ ===================== */
+let imgState = null;
+function drawImageResult() {
+  if (!imgState) return; const c = $('icanvas'), x = c.getContext('2d'), conf = +$('iconf').value;
+  x.drawImage(imgState.img, 0, 0); const lw = Math.max(2, Math.round(c.width / 600));
+  const bs = imgState.boxes.filter(b => b[4] >= conf);
+  x.lineWidth = lw; x.strokeStyle = '#1f9d63'; x.font = `${10 + 3 * lw}px IBM Plex Mono, monospace`; x.fillStyle = '#1f9d63';
+  bs.forEach(b => { x.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]); });
+  $('icount').textContent = bs.length; imgState.shown = bs;
+}
+async function handleImage(file) {
+  if (!session) { alertMsg('Загвар ачаалагдаагүй байна'); return; }
+  const img = await createImageBitmap(file); const c = $('icanvas'); c.width = img.width; c.height = img.height; c.classList.remove('hidden');
+  c.getContext('2d').drawImage(img, 0, 0); $('icount').textContent = '…'; $('isize').textContent = `${img.width}×${img.height}`;
+  const t0 = performance.now(); const r = await detect(img, img.width, img.height, false);
+  imgState = { img, boxes: r.boxes, name: file.name }; $('itiles').textContent = r.tiles; $('itime').textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' с';
+  drawImageResult(); $('ipng').disabled = $('icsv').disabled = false;
+}
+function alertMsg(s) { $('mstat').textContent = s; }
+
+/* ===================== ВИДЕО: бүртгэл + tracking ===================== */
+let cvReady = null;
+function loadCV() {
+  if (cvReady) return cvReady;
+  cvReady = new Promise((res, rej) => { const s = document.createElement('script'); s.src = CFG.OPENCV_URL; s.async = true;
+    s.onload = async () => { let c = window.cv; if (c instanceof Promise) c = await c; else if (!c.Mat) await new Promise(r => c.onRuntimeInitialized = r); res({ cv: c }); };  // wrap: Module is thenable
+    s.onerror = () => rej(new Error('OpenCV.js ачаалсангүй')); document.body.appendChild(s); });
+  return cvReady;
+}
+const REG = {
+  ransac(src, dst, thr = 5, iters = 1500) {
+    const N = src.length; if (N < 3) return null; let best = null, bestN = 0; let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const fit2 = (i, j) => { const [x1, y1] = src[i], [x2, y2] = src[j], [u1, v1] = dst[i], [u2, v2] = dst[j]; const dx = x2 - x1, dy = y2 - y1, du = u2 - u1, dv = v2 - v1, d = dx * dx + dy * dy; if (d < 1e-6) return null;
+      const a = (dx * du + dy * dv) / d, b = (dx * dv - dy * du) / d; return [a, b, u1 - (a * x1 - b * y1), v1 - (b * x1 + a * y1)]; };
+    const count = m => { let n = 0; const inl = new Array(N), t2 = thr * thr; for (let k = 0; k < N; k++) { const [x, y] = src[k]; const ex = m[0] * x - m[1] * y + m[2] - dst[k][0], ey = m[1] * x + m[0] * y + m[3] - dst[k][1]; inl[k] = ex * ex + ey * ey <= t2; if (inl[k]) n++; } return [n, inl]; };
+    for (let it = 0; it < iters; it++) { const i = Math.floor(rnd() * N), j = Math.floor(rnd() * N); if (i === j) continue; const m = fit2(i, j); if (!m) continue; const [n, inl] = count(m);
+      if (n > bestN) { bestN = n; best = { m, inl }; if (n > 0.8 * N && it > 50) break; } }
+    if (!best) return null; let sx = 0, sy = 0, su = 0, sv = 0, c = 0;
+    for (let k = 0; k < N; k++) if (best.inl[k]) { sx += src[k][0]; sy += src[k][1]; su += dst[k][0]; sv += dst[k][1]; c++; }
+    sx /= c; sy /= c; su /= c; sv /= c; let na = 0, nb = 0, den = 0;
+    for (let k = 0; k < N; k++) if (best.inl[k]) { const x = src[k][0] - sx, y = src[k][1] - sy, u = dst[k][0] - su, v = dst[k][1] - sv; na += x * u + y * v; nb += x * v - y * u; den += x * x + y * y; }
+    const a = na / den, b = nb / den, m = [a, b, su - (a * sx - b * sy), sv - (b * sx + a * sy)]; const [n] = count(m); return { M: m, n, ratio: n / N };
+  },
+  mat: (m, s = 1) => [[m[0], -m[1], m[2] * s], [m[1], m[0], m[3] * s], [0, 0, 1]],
+  mul: (A, B) => A.map(r => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j])),
+  apply: (W, x, y) => [W[0][0] * x + W[0][1] * y + W[0][2], W[1][0] * x + W[1][1] * y + W[1][2]],
+};
+class Registrar {
+  constructor(cv) { this.cv = cv; this.det = new cv.AKAZE(); if (this.det.setThreshold) this.det.setThreshold(0.0005);
+    this.bf = new cv.BFMatcher(cv.NORM_HAMMING, false); this.clahe = new cv.CLAHE(2.0, new cv.Size(8, 8)); this.refs = []; this.last = null; this.n = 0; }
+  features(gray, mask) { const cv = this.cv, eq = new cv.Mat(); this.clahe.apply(gray, eq); const kp = new cv.KeyPointVector(), des = new cv.Mat();
+    this.det.detectAndCompute(eq, mask, kp, des); const pts = []; for (let i = 0; i < kp.size(); i++) { const p = kp.get(i).pt; pts.push([p.x, p.y]); } kp.delete(); eq.delete(); return { pts, des }; }
+  match(f, ref) { const cv = this.cv; if (f.des.rows < 10 || ref.des.rows < 10) return null; const mm = new cv.DMatchVectorVector(); this.bf.knnMatch(f.des, ref.des, mm, 2); const s = [], d = [];
+    for (let i = 0; i < mm.size(); i++) { const m = mm.get(i); if (m.size() < 2) continue; const a = m.get(0), b = m.get(1); if (a.distance < 0.8 * b.distance) { s.push(f.pts[a.queryIdx]); d.push(ref.pts[a.trainIdx]); } }
+    mm.delete(); if (s.length < 10) return null; const r = REG.ransac(s, d, 5); if (!r) return null; const sc = Math.hypot(r.M[0], r.M[1]);
+    return (r.n < 10 || r.ratio < 0.3 || sc < 0.6 || sc > 1.7) ? null : r; }
+  register(gray, mask, scale) { // gray may be downscaled by `scale`; returned W is in full-resolution work coords
+    const f = this.features(gray, mask); this.n++;
+    if (!this.refs.length) { const W = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]; const ref = { ...f, world: W }; this.refs.push(ref); this.last = ref; return { W, inliers: f.pts.length }; }
+    let best = null; for (const ref of (this.last ? [this.last] : []).concat(this.refs.slice().reverse())) { const r = this.match(f, ref); if (!r) continue; if (!best || r.n > best.r.n) best = { r, ref }; if (r.n >= 60) break; }
+    if (!best) { f.des.delete(); return { W: null, inliers: 0 }; }
+    const W = REG.mul(best.ref.world, REG.mat(best.r.M, 1 / scale)); const cur = { ...f, world: W };
+    if (this.last && !this.refs.includes(this.last)) this.last.des.delete(); this.last = cur;
+    if (best.r.n >= 14 && this.n % 4 === 0) { this.refs.push(cur); if (this.refs.length > 40) { const old = this.refs.splice(1, 1)[0]; if (old !== this.last) old.des.delete(); } }
+    return { W, inliers: best.r.n };
+  }
+  dispose() { const seen = new Set(); for (const r of this.refs.concat(this.last ? [this.last] : [])) if (!seen.has(r)) { seen.add(r); try { r.des.delete(); } catch (e) {} } }
+}
+const seek = (v, t) => new Promise(res => { const h = () => { v.removeEventListener('seeked', h); res(); }; v.addEventListener('seeked', h); v.currentTime = t; });
+async function contentBox(v, n = 15, thr = 22) {
+  const w = v.videoWidth, h = v.videoHeight, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); const mx = new Uint8Array(w * h);
+  for (let k = 0; k < n; k++) { await seek(v, (v.duration - 0.05) * k / (n - 1)); x.drawImage(v, 0, 0); const d = x.getImageData(0, 0, w, h).data;
+    for (let i = 0; i < w * h; i++) { const g = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000; if (g > mx[i]) mx[i] = g; } }
+  const cf = new Float32Array(w), rf = new Float32Array(h); for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) if (mx[y * w + xx] > thr) { cf[xx]++; rf[y]++; }
+  let x0 = w, x1 = 0, y0 = h, y1 = 0; for (let i = 0; i < w; i++) if (cf[i] / h > .25) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); }
+  for (let i = 0; i < h; i++) if (rf[i] / w > .10) { y0 = Math.min(y0, i); y1 = Math.max(y1, i); } return (x1 <= x0 || y1 <= y0) ? [0, 0, w, h] : [x0, y0, x1 + 1, y1 + 1];
+}
+function roiMask(cv, gray, k) {
+  const b = new cv.Mat(), m = new cv.Mat(); cv.GaussianBlur(gray, b, new cv.Size(0, 0), 3); cv.threshold(b, m, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+  const K = cv.Mat.ones(25, 25, cv.CV_8U); cv.morphologyEx(m, m, cv.MORPH_CLOSE, K); K.delete();
+  const lab = new cv.Mat(), st = new cv.Mat(), cen = new cv.Mat(), n = cv.connectedComponentsWithStats(m, lab, st, cen);
+  let best = 1, ar = -1; for (let i = 1; i < n; i++) { const a = st.intAt(i, cv.CC_STAT_AREA); if (a > ar) { ar = a; best = i; } }
+  const out = new cv.Mat(gray.rows, gray.cols, cv.CV_8U, new cv.Scalar(0)); if (n > 1) { const L = lab.data32S, O = out.data; for (let i = 0; i < L.length; i++) O[i] = L[i] === best ? 255 : 0; } else out.setTo(new cv.Scalar(255));
+  const E = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(k, k)); cv.erode(out, out, E); E.delete(); b.delete(); m.delete(); lab.delete(); st.delete(); cen.delete(); return out;
+}
+let vFileReady = false, stopFlag = false, vRows = [], vSummary = null;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function contentBoxLive(v, n = 10) { // live stream: sample frames ~0.1 s apart
+  const w = v.videoWidth, h = v.videoHeight, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); const mx = new Uint8Array(w * h);
+  for (let k = 0; k < n; k++) { x.drawImage(v, 0, 0); const d = x.getImageData(0, 0, w, h).data; for (let i = 0; i < w * h; i++) { const g = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000; if (g > mx[i]) mx[i] = g; } await sleep(100); }
+  const cf = new Float32Array(w), rf = new Float32Array(h); for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) if (mx[y * w + xx] > 22) { cf[xx]++; rf[y]++; }
+  let x0 = w, x1 = 0, y0 = h, y1 = 0; for (let i = 0; i < w; i++) if (cf[i] / h > .25) { x0 = Math.min(x0, i); x1 = Math.max(x1, i); }
+  for (let i = 0; i < h; i++) if (rf[i] / w > .10) { y0 = Math.min(y0, i); y1 = Math.max(y1, i); } return (x1 <= x0 || y1 <= y0) ? [0, 0, w, h] : [x0, y0, x1 + 1, y1 + 1];
+}
+let running = false, camStream = null;
+async function runVideo(mode = 'file') {
+  if (running || !session) return; running = true;
+  const { cv } = await loadCV(); const v = $('video'); stopFlag = false; vRows = [];
+  const live = mode === 'camera'; $('vbarWrap').classList.toggle('hidden', live); $('vmode').textContent = live ? '● ШУУД' : '';
+  const conf = +$('vconf').value, up = +$('vup').value, step = Math.max(0.02, +$('vint').value), minHits = Math.max(1, +$('vhits').value), fast = $('vfast').checked;
+  const manual = $('vmanual').value === '' ? null : +$('vmanual').value;
+  $('vstart').disabled = true; $('vstop').disabled = false; $('vcsv').disabled = true; alertMsg('Видео шинжилж байна…');
+  const box = live ? await contentBoxLive(v) : await contentBox(v), [x0, y0, x1, y1] = box, W = Math.round((x1 - x0) * up), H = Math.round((y1 - y0) * up);
+  const work = document.createElement('canvas'); work.width = W; work.height = H; const wx = work.getContext('2d', { willReadFrequently: true });
+  const view = $('vcanvas'); view.width = W; view.height = H; view.classList.remove('hidden'); const vx = view.getContext('2d');
+  const reg = new Registrar(cv), regScale = fast ? 0.5 : 1; let tracks = [], nid = 1, fails = 0, unc = 0, sizes = [];
+  const total = live ? 0 : Math.floor(v.duration / step) + 1; const tStart = performance.now();
+  for (let k = 0; !stopFlag; k++) {
+    let t;
+    if (!live) { t = k * step; if (t > v.duration - 1e-3) break; await seek(v, t); }
+    else { const due = tStart + k * step * 1000, now = performance.now(); if (now < due) await sleep(due - now); t = (performance.now() - tStart) / 1000; }
+    wx.drawImage(v, x0, y0, x1 - x0, y1 - y0, 0, 0, W, H);
+    const src = cv.imread(work), gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY); src.delete();
+    const roiDet = roiMask(cv, gray, 13); let g2 = gray; if (regScale !== 1) { g2 = new cv.Mat(); cv.resize(gray, g2, new cv.Size(0, 0), regScale, regScale, cv.INTER_AREA); }
+    const roiReg = roiMask(cv, g2, regScale === 1 ? 31 : 15); const rr = reg.register(g2, roiReg, regScale); roiReg.delete(); if (g2 !== gray) g2.delete();
+    const det = await detect(work, W, H, true); const RD = roiDet.data; const boxes = [];
+    for (const b of det.boxes) { if (b[4] < conf) continue; const cx = Math.round((b[0] + b[2]) / 2), cy = Math.round((b[1] + b[3]) / 2);
+      if (cx >= 0 && cy >= 0 && cx < W && cy < H && RD[cy * W + cx] > 0 && Math.min(b[2] - b[0], b[3] - b[1]) >= 6) boxes.push(b); }
+    roiDet.delete(); gray.delete();
+    boxes.forEach(b => sizes.push(Math.max(b[2] - b[0], b[3] - b[1]))); const sorted = sizes.slice().sort((a, b) => a - b);
+    const R = sorted.length ? 0.6 * sorted[Math.floor(sorted.length / 2)] : 25; const shown = [];
+    if (!rr.W) { fails++; unc += boxes.length; boxes.forEach(b => shown.push({ b, id: null, ok: false })); }
+    else {
+      const sc = Math.max(1e-6, Math.hypot(rr.W[0][0], rr.W[1][0]));
+      const obs = boxes.map(b => ({ pos: REG.apply(rr.W, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2), size: [(b[2] - b[0]) * sc, (b[3] - b[1]) * sc] }));
+      const cand = []; obs.forEach((o, i) => tracks.forEach((tr, j) => { const d = Math.hypot(o.pos[0] - tr.pos[0], o.pos[1] - tr.pos[1]);
+        const shape = Math.max(...[0, 1].map(q => Math.max(o.size[q] / Math.max(tr.size[q], 1), tr.size[q] / Math.max(o.size[q], 1))));
+        if (d <= R * Math.max(1, sc) && shape <= 2) cand.push([d + 5 * (shape - 1), i, j]); }));
+      cand.sort((a, b) => a[0] - b[0]); const ui = new Set(), uj = new Set(), asg = {};
+      for (const [, i, j] of cand) if (!ui.has(i) && !uj.has(j)) { asg[i] = j; ui.add(i); uj.add(j); }
+      boxes.forEach((b, i) => { const o = obs[i]; let tr;
+        if (i in asg) { tr = tracks[asg[i]]; tr.pos = [.7 * tr.pos[0] + .3 * o.pos[0], .7 * tr.pos[1] + .3 * o.pos[1]]; tr.size = [.7 * tr.size[0] + .3 * o.size[0], .7 * tr.size[1] + .3 * o.size[1]]; tr.hits++; tr.last = t; }
+        else { tr = { id: nid++, pos: o.pos, size: o.size, hits: 1, first: t, last: t }; tracks.push(tr); }
+        shown.push({ b, id: tr.id, ok: tr.hits >= minHits }); });
+    }
+    const uniq = tracks.filter(tr => tr.hits >= minHits).length;
+    vRows.push({ t: +t.toFixed(2), visible: boxes.length, total: uniq, reg_ok: !!rr.W, inliers: rr.inliers });
+    // draw
+    vx.drawImage(work, 0, 0); vx.lineWidth = 2; vx.font = '14px IBM Plex Mono, monospace';
+    shown.forEach(s => { const col = !rr.W ? '#cf3f35' : (s.ok ? '#1f9d63' : '#e8961f'); vx.strokeStyle = vx.fillStyle = col; vx.strokeRect(s.b[0], s.b[1], s.b[2] - s.b[0], s.b[3] - s.b[1]); vx.fillText(s.id ? String(s.id) : '?', s.b[0], Math.max(14, s.b[1] - 4)); });
+    vx.fillStyle = 'rgba(0,0,0,.6)'; vx.fillRect(0, 0, W, 26); vx.fillStyle = '#fff'; vx.fillText(`${t.toFixed(1)}с  харагдаж буй ${boxes.length}  давхардалгүй ${uniq}  бүртгэл ${rr.W ? 'OK' : 'АЛДАА'}`, 8, 18);
+    $('vcount').textContent = uniq; $('vt').textContent = live ? `${t.toFixed(1)} с (шууд)` : `${t.toFixed(1)} / ${v.duration.toFixed(1)} с`; $('vvis').textContent = boxes.length; $('vall').textContent = tracks.length; $('vfail').textContent = `${fails} / ${k + 1}`;
+    if (!live) $('vbar').style.width = (100 * (k + 1) / total).toFixed(1) + '%';
+    await new Promise(r => setTimeout(r, 0));
+  }
+  reg.dispose(); running = false; if (live) stopCamera();
+  const uniq = tracks.filter(tr => tr.hits >= minHits).length;
+  vSummary = { mode, unique: uniq, all_tracks: tracks.length, registration_failures: fails, samples: vRows.length, uncertain_observations: unc, manual, box, upscale: up, conf, interval: step, min_hits: minHits };
+  $('vref').textContent = manual == null ? '—' : `гараар ${manual} · зөрүү ${Math.abs(uniq - manual)}`;
+  drawChart(manual); $('vstart').disabled = false; $('vstop').disabled = true; $('vcsv').disabled = false; $('vbar').style.width = '100%';
+  alertMsg(stopFlag ? 'Зогсоосон' : 'Дууслаа'); window.__VIDEO_DONE = vSummary;
+}
+function drawChart(manual) {
+  const c = $('vchart'); c.classList.remove('hidden'); const x = c.getContext('2d'), W = c.width, H = c.height, P = 40; x.clearRect(0, 0, W, H);
+  if (!vRows.length) return; const tmax = vRows[vRows.length - 1].t || 1, ymax = Math.max(1, ...vRows.map(r => Math.max(r.total, r.visible)), manual || 0) * 1.1;
+  const X = t => P + (W - P - 10) * t / tmax, Y = y => H - P + 10 - (H - P - 10) * y / ymax;
+  x.strokeStyle = '#dbe2ec'; x.fillStyle = '#5d6b7e'; x.font = '12px IBM Plex Sans, sans-serif'; x.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const yv = ymax * i / 4, yy = Y(yv); x.beginPath(); x.moveTo(P, yy); x.lineTo(W - 10, yy); x.stroke(); x.fillText(yv.toFixed(0), 6, yy + 4); }
+  x.fillText('хугацаа (с)', W - 80, H - 6);
+  const line = (key, col, w) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); vRows.forEach((r, i) => { const px = X(r.t), py = Y(r[key]); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.stroke(); };
+  line('visible', '#9fb1c6', 1.5); line('total', '#0f8a7e', 2.5);
+  if (manual != null) { x.setLineDash([6, 5]); x.strokeStyle = '#14202e'; x.beginPath(); x.moveTo(P, Y(manual)); x.lineTo(W - 10, Y(manual)); x.stroke(); x.setLineDash([]); }
+  x.fillStyle = '#cf3f35'; vRows.filter(r => !r.reg_ok).forEach(r => x.fillRect(X(r.t) - 1.5, Y(r.total) - 1.5, 3, 3));
+  x.fillStyle = '#0f8a7e'; x.fillText('— давхардалгүй тоо', P + 6, 16); x.fillStyle = '#7f93aa'; x.fillText('— тухайн фрейм', P + 140, 16); if (manual != null) { x.fillStyle = '#14202e'; x.fillText('- - гараар тоолсон', P + 250, 16); }
+}
+
+/* ===================== UI ===================== */
+function dl(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+  $('tab-img').classList.toggle('hidden', b.dataset.tab !== 'img'); $('tab-vid').classList.toggle('hidden', b.dataset.tab !== 'vid'); if (b.dataset.tab === 'vid') loadCV().catch(e => alertMsg(e.message)); });
+function wireDrop(drop, input, fn) { drop.onclick = () => input.click(); input.onchange = () => input.files[0] && fn(input.files[0]);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('hover'); }; drop.ondragleave = () => drop.classList.remove('hover');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('hover'); e.dataTransfer.files[0] && fn(e.dataTransfer.files[0]); }; }
+wireDrop($('idrop'), $('ifile'), handleImage);
+wireDrop($('vdrop'), $('vfile'), f => { const v = $('video'); v.src = URL.createObjectURL(f); stopCamera(); v.srcObject = null; v.src = URL.createObjectURL(f); v.onloadedmetadata = () => { vFileReady = true; $('vstart').disabled = !session; $('vlabel').textContent = `${f.name} · ${v.videoWidth}×${v.videoHeight} · ${v.duration.toFixed(1)} с`; autoStart(); }; });
+function autoStart() { if (!vFileReady) return; if (session) startFile(); else pendingAuto = true; }
+let pendingAuto = false;
+function startFile() { if (running) return; runVideo('file').catch(e => { running = false; console.error(e); alertMsg('Алдаа: ' + e.message); $('vstart').disabled = false; $('vstop').disabled = true; }); }
+function stopCamera() { if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } $('vmode').textContent = ''; }
+async function startCamera(deviceId) {
+  if (running) { stopFlag = true; while (running) await sleep(100); }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alertMsg('Энэ хөтөч камер дэмжихгүй (HTTPS шаардлагатай)'); return; }
+  try {
+    stopCamera();
+    camStream = await navigator.mediaDevices.getUserMedia({ video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1280 } } : { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+    const v = $('video'); v.removeAttribute('src'); v.srcObject = camStream; await v.play();
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); const sel = $('vcamSel');
+    if (cams.length > 1) { sel.innerHTML = cams.map((d, i) => `<option value="${d.deviceId}">${d.label || 'Камер ' + (i + 1)}</option>`).join(''); sel.value = camStream.getVideoTracks()[0].getSettings().deviceId || cams[0].deviceId; sel.classList.remove('hidden'); }
+    $('vlabel').textContent = 'Камер: ' + (camStream.getVideoTracks()[0].label || 'идэвхтэй');
+    runVideo('camera').catch(e => { running = false; console.error(e); alertMsg('Алдаа: ' + e.message); stopCamera(); });
+  } catch (e) { alertMsg('Камер нээж чадсангүй: ' + e.message); }
+}
+$('vcamBtn').onclick = () => { if (!session) { alertMsg('Загвар ачаалагдаагүй байна'); return; } startCamera(); };
+$('vcamSel').onchange = () => startCamera($('vcamSel').value);
+$('iconf').oninput = () => { $('iconfv').textContent = (+$('iconf').value).toFixed(2); drawImageResult(); };
+$('vconf').oninput = () => $('vconfv').textContent = (+$('vconf').value).toFixed(2);
+$('vup').oninput = () => $('vupv').textContent = (+$('vup').value).toFixed(1) + '×';
+$('ipng').onclick = () => $('icanvas').toBlob(b => dl('ev_detections.png', b));
+$('icsv').onclick = () => dl('ev_detections.csv', new Blob(['x1,y1,x2,y2,score\n' + imgState.shown.map(b => b.map(v => v.toFixed(2)).join(',')).join('\n')], { type: 'text/csv' }));
+$('vstart').onclick = () => startFile();
+$('vstop').onclick = () => { stopFlag = true; };
+$('vcsv').onclick = () => dl('ev_video_counts.csv', new Blob(['t,visible,total,reg_ok,inliers\n' + vRows.map(r => [r.t, r.visible, r.total, r.reg_ok ? 1 : 0, r.inliers].join(',')).join('\n') + '\n\n# ' + JSON.stringify(vSummary)], { type: 'text/csv' }));
+loadModel();
+</script>
+</body>
+</html>
